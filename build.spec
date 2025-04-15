@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+# pyinstaller build.spec --clean --noconfirm
 block_cipher = None
 
 a = Analysis(

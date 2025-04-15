@@ -91,8 +91,8 @@ class TextExtractorApp:
 
     def capture_word(self):
         """捕获单词功能"""
-        print("检测到Ctrl+C组合键")
-        self.window_manager.log_message("操作日志: 检测到Ctrl+C组合键")
+        print(f"检测到{self.config['hotkeys']['get_word_hotkey']}组合键")
+        self.window_manager.log_message(f"操作日志: 检测到{self.config['hotkeys']['get_word_hotkey']}组合键")
         time.sleep(0.1)
         self.word = self.get_clipboard_text()
         if self.word:
@@ -104,8 +104,8 @@ class TextExtractorApp:
 
     def capture_sentence(self):
         """捕获句子功能"""
-        print("检测到Ctrl+S组合键")
-        self.window_manager.log_message("操作日志: 检测到Ctrl+S组合键")
+        print(f"检测到{self.config['hotkeys']['get_sentence_hotkey']}组合键")
+        self.window_manager.log_message(f"操作日志: 检测到{self.config['hotkeys']['get_sentence_hotkey']}组合键")
         time.sleep(0.1)
         self.sentence = self.get_clipboard_text()
         if self.sentence:
@@ -117,6 +117,8 @@ class TextExtractorApp:
 
     def add_word(self):
         """添加单词功能"""
+        print(f"检测到{self.config['hotkeys']['add_data']}组合键")
+        self.window_manager.log_message(f"操作日志: 检测到{self.config['hotkeys']['add_data']}组合键")
         self.word = self.window_manager.word_var.get()
         self.sentence = self.window_manager.sentence_var.get()
         if self.word:
