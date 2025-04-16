@@ -1,0 +1,6 @@
+# 忽略所有.ini文件
+*.ini
+
+# 忽略dist和build文件夹
+/dist
+/build

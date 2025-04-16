@@ -17,7 +17,7 @@ class HotkeyManager:
         for hotkey, callback in self.hotkeys.items():
             keyboard.add_hotkey(hotkey, callback, suppress=True)
         print("程序已启动，使用 Ctrl+C 捕获单词 | Ctrl+S 捕获句子 | Ctrl+D 添加单词")
-
+        
     def remove_hotkeys(self):
         """移除所有热键"""
         for hotkey in self.hotkeys.keys():
