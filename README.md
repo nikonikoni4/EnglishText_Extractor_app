@@ -2,7 +2,7 @@
 
 这是一个用于单词和句子提取的桌面小应用。可以实现提取所遇见的单词和句子，通过接入deepseek的api进行查询prompt中所自定义的内容（比如kk音标，例句，近义词，形近词等）。查询的数据保存为CSV文件可以直接导入到Anki中快速制作卡片。
 
-<img src="D:\desktop\英语单词提取app\仓库\EnglishText_Extractor_app\figure\image-20250417155619662.png" alt="image-20250417155619662" style="zoom:50%;" />
+<img src=".\figure\image-20250417155619662.png" alt="image-20250417155619662" style="zoom:50%;" />
 
 
 
@@ -12,11 +12,11 @@
 
 1. **配置api和快捷键**：点击菜单，打开设置，输入deepseek的api并保存。设置相关快接键
 
-   <img src="D:\desktop\英语单词提取app\仓库\EnglishText_Extractor_app\figure\image-20250417155058076.png" alt="image-20250417155058076" style="zoom: 50%;" />
+   <img src=".\figure\image-20250417155058076.png" alt="image-20250417155058076" style="zoom: 50%;" />
 
 2. **配置prompt**：在prompt中修改相应内容自定义需要deepseek回复的信息，并对相应回复内容做出要求
 
-   ![image-20250417155449794](D:\desktop\英语单词提取app\仓库\EnglishText_Extractor_ap\figurep\image-20250417155449794.png)
+   ![image-20250417155449794](.\figurep\image-20250417155449794.png)
 
    
 
@@ -30,4 +30,4 @@
 
 7. **查看已添加单词**:已经添加的单词可以在菜单->单词列表中查看，误添加单词可以选择并删除。
 
-   <img src="D:\desktop\英语单词提取app\仓库\EnglishText_Extractor_app\figure\image-20250417160010561.png" alt="image-20250417160010561" style="zoom: 50%;" />
+   <img src=".\figure\image-20250417160010561.png" alt="image-20250417160010561" style="zoom: 50%;" />
