@@ -2,7 +2,6 @@
 import time
 import threading
 import configparser
-from openpyxl import Workbook
 import win32clipboard
 import keyboard
 from hotkey_manager import HotkeyManager
@@ -159,19 +158,22 @@ class TextExtractorApp:
         """模型查词回调函数"""
         def disable_controls():
             """禁用控件"""
-            self.window_manager.log_signal.emit("禁用热键和控件")
-           #  self.hotkey_manager.remove_hotkeys()
-            # 禁用特定按钮
+            # self.window_manager.log_signal.emit("禁用热键和控件")
+            # 禁用按钮并设置灰色样式
             self.window_manager.save_btn.setEnabled(False)
+            self.window_manager.save_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
             self.window_manager.exit_btn.setEnabled(False)
+            self.window_manager.exit_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
         
         def enable_controls():
             """启用控件"""
-           # self.hotkey_manager.setup_hotkeys()
-            # 启用特定按钮
+            # self.hotkey_manager.setup_hotkeys()
+            # 启用按钮并恢复原样式
             self.window_manager.save_btn.setEnabled(True)
+            self.window_manager.save_btn.setStyleSheet("")
             self.window_manager.exit_btn.setEnabled(True)
-            self.window_manager.log_signal.emit("启用热键和控件")
+            self.window_manager.exit_btn.setStyleSheet("")
+            # self.window_manager.log_signal.emit("启用热键和控件")
         
         def query_task():
             try:

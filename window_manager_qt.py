@@ -22,7 +22,7 @@ class WindowManagerQt(QMainWindow):
 
     def _init_ui(self):
         # 主窗口配置
-        self.setWindowTitle("📚 单词管理工具 Qt版 v1.0")
+        self.setWindowTitle("📚 单词管理工具 v2.0")
         # 获取屏幕尺寸并计算右上角位置
         screen_geometry = QApplication.primaryScreen().availableGeometry()
         window_width = 300
@@ -343,7 +343,7 @@ class WordListWindow(QDialog):
             checkbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)  # 新增：垂直方向扩展
             
             # 显示内容
-            content = QLabel(f"{idx+1}. 单词: {item['单词']}\n   例句: {item['例句']}")
+            content = QLabel(f"{idx+1}. 单词: {item['单词']}  例句: {item['例句']}")
             content.setWordWrap(True)
             content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 新增：双向扩展
             
@@ -353,7 +353,7 @@ class WordListWindow(QDialog):
             widget.setLayout(item_layout)
             
             # 设置列表项的最小高度
-            list_item.setSizeHint(QSize(0, 60))  # 新增：设置列表项最小高度为60像素
+            list_item.setSizeHint(QSize(0, 80))  # 新增：设置列表项最小高度为60像素
             
             self.list_widget.addItem(list_item)
             self.list_widget.setItemWidget(list_item, widget)

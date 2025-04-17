@@ -4,19 +4,20 @@ block_cipher = None
 
 a = Analysis(
     ['text_extractor_app.py'],
-    pathex=['D:/desktop/英语单词提取app', 'D:/program/language'],
+    pathex=['D:/desktop/英语单词提取app/仓库/EnglishText_Extractor_app'],
     binaries=[],
     datas=[('config.ini', '.')],
-    hiddenimports=[],
+    hiddenimports=['PySide6'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
         'unittest', 'pytest', 'test',
-        'numpy', 'matplotlib', 'scipy',
-        'django', 'flask',
-        'pandas', 'sqlalchemy'
-    ],  # 修正后的排除项（保留tkinter）
+        # 'numpy', 'matplotlib', 'scipy',
+        'django', 'flask', 'sqlalchemy',
+        'pandas', 'openpyxl', 'xlrd',
+        'psutil', 'chardet', 'html5lib'
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
