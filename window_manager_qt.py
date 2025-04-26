@@ -1,11 +1,11 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout, 
                               QGridLayout, QLabel, QLineEdit, QPushButton, QTextEdit,
-                              QMenuBar, QMenu, QTabWidget, QScrollArea, QFrame, QApplication,
+                              QMenuBar,QApplication,
                               QListWidget, QListWidgetItem, QCheckBox, QSizePolicy)  # 添加QSizePolicy
 
 from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt, Signal, Slot, QSize
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut, QTextCursor
+from PySide6.QtGui import QTextCursor
 
 class WindowManagerQt(QMainWindow):
     word_changed = Signal(str)
@@ -105,17 +105,20 @@ class WindowManagerQt(QMainWindow):
         
         # 初始化显示热键配置
         self.show_hotkeys_and_prompt()
+        
+        # 检查必需字段
+        required_keys = self.app.required_keys
+        if '单词' not in required_keys or '例句' not in required_keys:
+            warning = "警告: prompt中必须包含'单词'和'例句'字段！\n当前检测到的字段: {}".format(required_keys)
+            self.log_signal.emit(warning)
 
     def show_hotkeys_and_prompt(self):
-        """显示当前热键和提示信息"""
+        """显示当前热键配置"""
         hotkey_info = f"""
 当前热键配置：
 - 提取单词: {self.app.config['hotkeys']['get_word_hotkey']}
 - 提取句子: {self.app.config['hotkeys']['get_sentence_hotkey']}
 - 添加数据: {self.app.config['hotkeys']['add_data']}
-
-当前Prompt提示词：
-{self.app.config['prompt'].get('default', '')}
 """
         self.console.setPlainText(hotkey_info)
         self.console.moveCursor(QTextCursor.End)
@@ -286,21 +289,22 @@ class WordListWindow(QDialog):
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.setWindowTitle("单词列表")
-        self.resize(600, 600)  # 增加窗口高度
-        self.app = app  # 直接接收app引用
+        self.resize(600, 600)
+        self.app = app
         self._init_ui()
+        # 统一设置样式
         self.setStyleSheet("""
             QListWidget {
                 border: 1px solid #ddd;
                 font-size: 8pt;
             }
             QCheckBox {
-                margin: 1px;
-                        
+                margin: 5px;
             }
             QLabel {
-                margin-left: 5px;
-               min-height: 10px;
+                margin-left: 10px;
+                font-size: 8pt;
+                min-height: 20px;
             }
         """)
 
@@ -373,13 +377,13 @@ class WordListWindow(QDialog):
         
         # 反向删除避免索引错乱
         if selected_indices:
-            # 调用主程序的删除方法
+            # 直接删除数据并保存到临时文件
             for idx in reversed(sorted(selected_indices)):
-                self.app.app.delete_word(idx)
+                if 0 <= idx < len(self.app.app.data):
+                    del self.app.app.data[idx]
             
-            # 保存更改并刷新界面
-            self.app.app.save_record(append_mode=False)
+            self.app.app._save_temp_data()  # 强制保存到临时文件
             self._load_data()
-            self.app.window_manager.log_signal.emit(f"成功删除 {len(selected_indices)} 条记录")
+            self.app.app.window_manager.log_signal.emit(f"已删除{len(selected_indices)}条记录并更新临时文件")
         else:
-            self.app.window_manager.log_signal.emit("请先选择要删除的条目")
+            self.app.app.window_manager.log_signal.emit("请先选择要删除的条目")

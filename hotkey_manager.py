@@ -1,7 +1,5 @@
 import keyboard
 
-
-
 class HotkeyManager:
     def __init__(self, app):
         self.app = app
