@@ -1,6 +1,7 @@
 # 忽略所有.ini文件
 config.ini
 单词列表.csv
+temp_words.csv
 # 忽略dist和build文件夹
 /dist
 /build
