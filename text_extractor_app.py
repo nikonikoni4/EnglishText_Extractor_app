@@ -17,7 +17,6 @@ class TextExtractorApp:
         self.data = []
         self.data_lock = threading.Lock()  # 初始化线程锁
         self.config = self.load_config()
-        self.query_loc = 0
         self.required_keys = self.get_required_keys()
         self.temp_file = os.path.join(os.path.dirname(__file__), "temp_words.csv")
         self.file_operation = self.QueryFileOperation(self.temp_file)  # 初始化文件锁
@@ -211,10 +210,6 @@ class TextExtractorApp:
         if 0 <= index < len(self.data):
             deleted_word = self.data[index]['单词']  # 记录被删除的单词
             del self.data[index]
-            
-            # 调整查询指针位置
-            if index < self.query_loc:
-                self.query_loc -= 1
                 
             # 立即保存到临时文件
             self._save_temp_data()
@@ -240,7 +235,27 @@ class TextExtractorApp:
     def _save_temp_data(self):
         """将self.data保存到临时文件"""
         try:
-            pd.DataFrame(self.data).to_csv(self.temp_file, index=False)
+            with self.file_operation:
+                file_exists = os.path.exists(self.temp_file)
+                df_temp = pd.DataFrame()
+                if file_exists:
+                    df_temp = pd.read_csv(self.temp_file)
+                    df_temp = df_temp[df_temp['query_flag']==0]
+                
+                df_data = pd.DataFrame(self.data)
+                 # 找出df_data中单词存在于df_temp中的行索引
+                duplicate_indices = df_data[df_data['单词'].isin(df_temp['单词'])].index
+                # 删除重复行
+                df_data = df_data.drop(duplicate_indices)
+
+                df_data.to_csv(
+                    self.temp_file,
+                    mode='a' if file_exists else 'w',
+                    header=not file_exists,
+                    index=False
+                )
+        except TimeoutError:
+            self.window_manager._update_log("错误: 获取文件锁超时，保存临时数据失败")
         except Exception as e:
             self.window_manager._update_log(f"保存临时文件失败: {str(e)}")
 
@@ -309,7 +324,7 @@ class TextExtractorApp:
                 disable_controls()
                 api_key = self.config["api"]["api_key"]
                 self.window_manager._update_log("开始模型查询...")
-                for i in range(self.query_loc,len(self.data)):
+                for i in range(0,len(self.data)):
                     self.window_manager._update_log(f"查询单词: {self.data[i]['单词']}")
                     data = ask_model(api_key, word=self.data[i]["单词"], sentence=self.data[i]["例句"], config=self.config)
                     if data is None:
@@ -320,7 +335,7 @@ class TextExtractorApp:
                         self.data[i][key] = data[key]
                     self.data[i]["query_flag"] = 1  # 保持查询标志设置
                     self.window_manager.log_signal.emit(f"查询结果: {self.data[i]}")
-                    self.query_loc+=1
+                    
                 self.query_file_operation=True
                 self._save_temp_data()  # 保存更新后的查询状态
                 self.query_file_operation=False
