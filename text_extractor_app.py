@@ -1,5 +1,6 @@
 # 优化导入语句
 from pyexpat import model
+from re import T
 import sys
 import time
 import threading
@@ -211,8 +212,22 @@ class TextExtractorApp:
         with self.file_operation:
             try:
                 if os.path.exists(self.temp_file):
-                    df = pd.read_csv(self.temp_file)
-                    return df.to_dict('records')
+                    # 检查文件是否为空
+                    if os.path.getsize(self.temp_file) == 0:
+                        self.window_manager._update_log("临时文件为空，返回空列表")
+                        return []
+                    try:
+                        df = pd.read_csv(self.temp_file)
+                        return df.to_dict('records')
+                    except pd.errors.EmptyDataError:
+                        # 处理空文件情况
+                        self.window_manager._update_log("临时文件为空数据，返回空列表")
+                        return []
+                    except Exception as e:
+                        # 文件格式错误，删除并创建新文件
+                        self.window_manager._update_log(f"临时文件格式错误，正在重置: {str(e)}")
+                        os.remove(self.temp_file)
+                        return []
                 else:
                     return []
             except Exception as e:
@@ -227,12 +242,21 @@ class TextExtractorApp:
                 df_temp = pd.DataFrame() # 读取临时文件
                 df_data = pd.DataFrame(data) # 当前已添加的单词列表
                 if file_exists:
-                    df_temp = pd.read_csv(self.temp_file)
-                    # 如果df_temp的单词中存在着与df_data相同的单词，则用df_data
-                    df_data = pd.concat([df_data,df_temp],ignore_index =True)
-                    # 保存已经查询过的数据
-                    df_data = df_data.sort_values('query_flag', ascending=False)
-                    df_data = df_data.drop_duplicates(subset=['单词'], keep='first')
+                    try:
+                        # 检查文件是否为空
+                        if os.path.getsize(self.temp_file) == 0:
+                            # 文件为空，直接写入新数据
+                            pass
+                        else:
+                            df_temp = pd.read_csv(self.temp_file)
+                            # 如果df_temp的单词中存在着与df_data相同的单词，则用df_data
+                            df_data = pd.concat([df_data,df_temp],ignore_index=True)
+                            # 保存已经查询过的数据
+                            df_data = df_data.sort_values('query_flag', ascending=False)
+                            df_data = df_data.drop_duplicates(subset=['单词'], keep='first')
+                    except Exception as e:
+                        self.window_manager._update_log(f"读取临时文件失败，将创建新文件: {str(e)}")
+                        # 文件可能损坏，继续使用新数据
                 df_data.to_csv(
                     self.temp_file,
                     header=True,
