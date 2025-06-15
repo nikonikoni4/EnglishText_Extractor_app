@@ -10,6 +10,9 @@
 
 # 使用方法
 
+0. **修改配置文件名词**：
+   将config copy.ini 修改为 config.ini
+
 1. **配置api和快捷键**：点击菜单，打开设置，输入deepseek的api并保存。设置相关快接键
 
    <img src=".\figure\image-20250417155058076.png" alt="image-20250417155058076" style="zoom: 50%;" />
