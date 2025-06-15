@@ -1,4 +1,5 @@
 # 优化导入语句
+from pyexpat import model
 import sys
 import time
 import threading
@@ -218,8 +219,8 @@ class TextExtractorApp:
                 self.window_manager._update_log(f"同步临时文件失败: {str(e)}")
                 return []
 
-    def save_temp_data(self,data:list):
-        """将temp_data保存到临时文件"""
+    def save_add_data(self,data:list):
+        """将temp_data保存到临时文件,保存形式是追加和去重"""
         try:
             with self.file_operation:
                 file_exists = os.path.exists(self.temp_file)
@@ -242,7 +243,8 @@ class TextExtractorApp:
         except Exception as e:
             self.window_manager._update_log(f"保存临时文件失败: {str(e)}")
             print(f"保存临时文件失败: {str(e)}")
-
+    def cover_temp_data(self,data:list):
+        pd.DataFrame(data).to_csv(self.temp_file,mode='w',index=False,header=True)
     def del_query_data(self):
         """将temp_data保存到临时文件"""
         try:
@@ -273,7 +275,7 @@ class TextExtractorApp:
             for key in self.required_keys:
                 if key not in data:
                     data[key] = ""
-            self.save_temp_data([data])  # 保存到临时文件
+            self.save_add_data([data])  # 保存到临时文件
             
             self.window_manager.word_input.clear()
             self.window_manager.sentence_input.clear()
@@ -304,8 +306,8 @@ class TextExtractorApp:
             self.window_manager.save_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
             self.window_manager.exit_btn.setEnabled(False)
             self.window_manager.exit_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
-            # self.window_manager.query_btn.setEnabled(False)
-            # self.window_manager.query_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
+            self.window_manager.query_btn.setEnabled(False)
+            self.window_manager.query_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
         def enable_controls():
             """启用控件"""
             # self.hotkey_manager.setup_hotkeys()
@@ -314,8 +316,8 @@ class TextExtractorApp:
             self.window_manager.save_btn.setStyleSheet("")
             self.window_manager.exit_btn.setEnabled(True)
             self.window_manager.exit_btn.setStyleSheet("")
-            # self.window_manager.query_btn.setEnabled(True)
-            # self.window_manager.query_btn.setStyleSheet("")
+            self.window_manager.query_btn.setEnabled(True)
+            self.window_manager.query_btn.setStyleSheet("")
             # self.window_manager.log_signal.emit("启用热键和控件")
         
         def query_task(query_data:list):
@@ -336,7 +338,7 @@ class TextExtractorApp:
                     query_data[i]["query_flag"] = 1  # 保持查询标志设置
                     self.window_manager.log_signal.emit(f"查询结果: {query_data[i]}")
                     
-                self.save_temp_data(query_data)  # 保存更新后的查询状态
+                self.save_add_data(query_data)  # 保存更新后的查询状态
                 self.window_manager._update_log("模型查询完成")
             except Exception as e:
                 error_message = f"查询错误: {str(e)}"
@@ -348,7 +350,7 @@ class TextExtractorApp:
 
         if query_data:
             self._query_complete = False  # 新增：查询完成标志
-            threading.Thread(target=query_task(query_data), daemon=True).start()
+            threading.Thread(target=query_task, args=(query_data,), daemon=True).start()
         else:
             self.window_manager.log_signal.emit(f"无有效查询数据")
             print(f"无有效查询数据")
@@ -368,7 +370,7 @@ class TextExtractorApp:
         # 保存数据
         self.save_record()
         self.window_manager._update_log("操作日志: 退出程序")
-        
+        self.del_query_data()  # 删除已经查询过的数据
         # 关闭窗口
         self.window_manager.close()
 
@@ -420,7 +422,7 @@ class TextExtractorApp:
             self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
             
 
-            self.del_query_data()  # 删除已经查询过的数据
+            
 
 
         # if not save_data:
@@ -457,7 +459,7 @@ class TextExtractorApp:
         #     self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
 
         #     # 删除以保留的临时文件
-        #     self.save_temp_data()  # 重新加载最新数据
+        #     self.save_add_data()  # 重新加载最新数据
         except Exception as e:
             self.window_manager._update_log(f"保存失败: {str(e)}")
 

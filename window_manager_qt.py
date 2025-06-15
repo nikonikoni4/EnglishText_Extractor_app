@@ -385,7 +385,7 @@ class WordListWindow(QDialog):
                 if 0 <= idx < len(word_list):
                     del word_list[idx]
             
-            self.main_window.app.save_temp_data(word_list)  # 强制保存到临时文件
+            self.main_window.app.cover_temp_data(word_list)  # 强制保存到临时文件
             self._load_data()
             self.main_window.app.window_manager.log_signal.emit(f"已删除{len(selected_indices)}条记录并更新临时文件")
         else:
