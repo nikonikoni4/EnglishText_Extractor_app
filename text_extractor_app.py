@@ -445,49 +445,93 @@ class TextExtractorApp:
             df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
             self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
             
-
+            # 新增功能：分析词根、前缀、后缀
+            self._analyze_word_components(df)
             
-
-
-        # if not save_data:
-        #     self.window_manager._update_log("警告: 没有数据可保存")
-        #     return
-    
-        # try:
-        #     # 使用pandas保存CSV
-        #     csv_filename = self.config["file"]["output_name"] + ".csv"
-        #     file_exists = os.path.exists(csv_filename)
-            
-        #     # 动态生成字段列表
-        #     if file_exists:
-        #         # 读取已有文件的列名
-        #         existing_columns = pd.read_csv(csv_filename, nrows=0).columns.tolist()
-        #         # 过滤数据只保留已有列
-        #         filtered_data = []
-        #         for item in save_data:
-        #             filtered_item = {k: v for k, v in item.items() if k in existing_columns}
-        #             filtered_data.append(filtered_item)
-        #     else:
-        #         # 新文件时使用全部字段
-        #         all_keys = set().union(*(d.keys() for d in save_data))
-        #         fieldnames = [k for k in self.required_keys if k in all_keys] + \
-        #                     [k for k in all_keys if k not in self.required_keys and k != 'query_flag'] + \
-        #                     ['query_flag']
-        #         filtered_data = save_data
-            
-        #     # 转换为DataFrame并保存
-        #     df = pd.DataFrame(filtered_data)
-        #     df.to_csv(csv_filename, mode='a', index=False, 
-        #              header=not file_exists, encoding='utf-8-sig')
-                    
-        #     self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
-
-        #     # 删除以保留的临时文件
-        #     self.save_add_data()  # 重新加载最新数据
         except Exception as e:
             self.window_manager._update_log(f"保存失败: {str(e)}")
-
-
+    
+    def _analyze_word_components(self, df):
+        """分析词根、前缀、后缀并生成总结文件"""
+        import pandas as pd
+        from collections import defaultdict
+        
+        try:
+            # 1. 判断required_keys是否包含前缀、后缀、词根
+            required_keys = self.get_required_keys()
+            has_prefix = any('前缀' in key for key in required_keys)
+            has_suffix = any('后缀' in key for key in required_keys)
+            has_root = any('词根' in key for key in required_keys)
+            
+            self.window_manager._update_log(f"检测到字段: 前缀={has_prefix}, 后缀={has_suffix}, 词根={has_root}")
+            
+            # 2. 分析数据
+            components = {
+                '词根': defaultdict(list) if has_root else None,
+                '前缀': defaultdict(list) if has_prefix else None,
+                '后缀': defaultdict(list) if has_suffix else None
+            }
+            
+            for _, row in df.iterrows():
+                word = row.get('单词', '')
+                if not word:
+                    continue
+                    
+                # 分析词根
+                if has_root:
+                    for key in required_keys:
+                        if '词根' in key and key in row and pd.notna(row[key]) and row[key].strip():
+                            roots = str(row[key]).split(',') if ',' in str(row[key]) else [str(row[key])]
+                            for root in roots:
+                                root = root.strip()
+                                if root and root.lower() != 'none' and len(components['词根'][root]) < 3:
+                                    components['词根'][root].append(word)
+                    
+                # 分析前缀
+                if has_prefix:
+                    for key in required_keys:
+                        if '前缀' in key and key in row and pd.notna(row[key]) and row[key].strip():
+                            prefixes = str(row[key]).split(',') if ',' in str(row[key]) else [str(row[key])]
+                            for prefix in prefixes:
+                                prefix = prefix.strip()
+                                if prefix and prefix.lower() != 'none' and len(components['前缀'][prefix]) < 3:
+                                    components['前缀'][prefix].append(word)
+                    
+                # 分析后缀
+                if has_suffix:
+                    for key in required_keys:
+                        if '后缀' in key and key in row and pd.notna(row[key]) and row[key].strip():
+                            suffixes = str(row[key]).split(',') if ',' in str(row[key]) else [str(row[key])]
+                            for suffix in suffixes:
+                                suffix = suffix.strip()
+                                if suffix and suffix.lower() != 'none' and len(components['后缀'][suffix]) < 3:
+                                    components['后缀'][suffix].append(word)
+            
+            # 3. 生成CSV文件
+            base_name = self.config["file"]["output_name"]
+            
+            for component_type, data in components.items():
+                if data is not None and data:
+                    # 准备数据
+                    summary_data = []
+                    for component, words in data.items():
+                        if words:  # 只保存有单词例子的组件
+                            summary_data.append({
+                                component_type: component,
+                                '单词例子': ', '.join(words[:3])  # 最多3个例子
+                            })
+                    
+                    if summary_data:
+                        # 保存到CSV
+                        filename = f"{base_name}_{component_type}总结.csv"
+                        summary_df = pd.DataFrame(summary_data)
+                        summary_df.to_csv(filename, index=False, encoding='utf-8-sig')
+                        self.window_manager._update_log(f"✓ 生成{component_type}总结文件: {os.path.abspath(filename)}")
+                    else:
+                        self.window_manager._update_log(f"警告: 没有找到{component_type}数据")
+                        
+        except Exception as e:
+            self.window_manager._update_log(f"分析词汇组件失败: {str(e)}")
 
 from PySide6.QtWidgets import QApplication
 import sys
