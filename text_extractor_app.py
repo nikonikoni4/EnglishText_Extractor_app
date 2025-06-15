@@ -14,14 +14,14 @@ class TextExtractorApp:
     def __init__(self):
         self.word = ""
         self.sentence = ""
-        self.data = []
+        # self.data = []
+        self.word_list = []
         self.data_lock = threading.Lock()  # 初始化线程锁
         self.config = self.load_config()
         self.required_keys = self.get_required_keys()
         self.temp_file = os.path.join(os.path.dirname(__file__), "temp_words.csv")
         self.file_operation = self.QueryFileOperation(self.temp_file)  # 初始化文件锁
         self.window_manager=WindowManagerQt(self)
-        self._sync_temp_data()  # 初始化时加载临时文件数据
         # 初始化管理器（延迟到QApplication创建后）
         self.window_manager = None
         self.hotkey_manager = HotkeyManager(self)
@@ -205,60 +205,58 @@ class TextExtractorApp:
             self.window_manager._update_log(f"错误: 读取配置文件失败: {str(e)}")
             return configparser.ConfigParser()  # 返回空配置对象
 
-    def delete_word(self, index):
-        """删除指定索引的单词数据"""
-        if 0 <= index < len(self.data):
-            deleted_word = self.data[index]['单词']  # 记录被删除的单词
-            del self.data[index]
-                
-            # 立即保存到临时文件
-            self._save_temp_data()
-            
-            # 更新界面显示
-            if self.window_manager:
-                self.window_manager.update_word_list()  # 刷新单词列表
-                self.window_manager._update_log(f"已删除单词: {deleted_word}")
-                
-            # 二次验证数据一致性
-            self._sync_temp_data()  # 重新加载确保数据同步
-
-    def _sync_temp_data(self):
-        """从临时文件同步数据到self.data"""
+    def get_temp_data(self)->list:
+        """获得临时文件中的数据"""
         with self.file_operation:
             try:
                 if os.path.exists(self.temp_file):
                     df = pd.read_csv(self.temp_file)
-                    self.data = df.to_dict('records')
+                    return df.to_dict('records')
+                else:
+                    return []
             except Exception as e:
                 self.window_manager._update_log(f"同步临时文件失败: {str(e)}")
+                return []
 
-    def _save_temp_data(self):
-        """将self.data保存到临时文件"""
+    def save_temp_data(self,data:list):
+        """将temp_data保存到临时文件"""
         try:
             with self.file_operation:
                 file_exists = os.path.exists(self.temp_file)
-                df_temp = pd.DataFrame()
+                df_temp = pd.DataFrame() # 读取临时文件
+                df_data = pd.DataFrame(data) # 当前已添加的单词列表
                 if file_exists:
                     df_temp = pd.read_csv(self.temp_file)
-                    df_temp = df_temp[df_temp['query_flag']==0]
-                
-                df_data = pd.DataFrame(self.data)
-                 # 找出df_data中单词存在于df_temp中的行索引
-                duplicate_indices = df_data[df_data['单词'].isin(df_temp['单词'])].index
-                # 删除重复行
-                df_data = df_data.drop(duplicate_indices)
-
+                    # 如果df_temp的单词中存在着与df_data相同的单词，则用df_data
+                    df_data = pd.concat([df_data,df_temp],ignore_index =True)
+                    # 保存已经查询过的数据
+                    df_data = df_data.sort_values('query_flag', ascending=False)
+                    df_data = df_data.drop_duplicates(subset=['单词'], keep='first')
                 df_data.to_csv(
                     self.temp_file,
-                    mode='a' if file_exists else 'w',
-                    header=not file_exists,
+                    header=True,
                     index=False
                 )
         except TimeoutError:
             self.window_manager._update_log("错误: 获取文件锁超时，保存临时数据失败")
         except Exception as e:
             self.window_manager._update_log(f"保存临时文件失败: {str(e)}")
+            print(f"保存临时文件失败: {str(e)}")
 
+    def del_query_data(self):
+        """将temp_data保存到临时文件"""
+        try:
+            with self.file_operation:
+                file_exists = os.path.exists(self.temp_file)
+                if file_exists:
+                    df_temp = pd.read_csv(self.temp_file)
+                    df_temp.query('query_flag == 0').to_csv(self.temp_file,index=False,header=True)
+               
+        except TimeoutError:
+            self.window_manager._update_log("错误: 获取文件锁超时，保存临时数据失败")
+        except Exception as e:
+            self.window_manager._update_log(f"保存临时文件失败: {str(e)}")
+            print(f"保存临时文件失败: {str(e)}")
     def add_word(self):
         """添加单词功能"""
         print(f"检测到{self.config['hotkeys']['add_data']}组合键")
@@ -275,9 +273,8 @@ class TextExtractorApp:
             for key in self.required_keys:
                 if key not in data:
                     data[key] = ""
-            self.data.append(data)
-            self._save_temp_data()  # 保存到临时文件
-            self.window_manager._update_log("已暂存单词记录")
+            self.save_temp_data([data])  # 保存到临时文件
+            
             self.window_manager.word_input.clear()
             self.window_manager.sentence_input.clear()
 
@@ -294,11 +291,10 @@ class TextExtractorApp:
 
     def model_query(self):
         """模型查词回调函数"""
-        self.query_file_operation= True
-        self._sync_temp_data()  # 查询前同步最新数据
-        self.query_file_operation= False
-        # 过滤未查询的单词
-        self.data = [item for item in self.data if item.get("query_flag", 1) == 0]
+
+        query_data = self.get_temp_data()  # 查询前同步最新数据
+        # 获得未查询的单词
+        query_data = [item for item in query_data if item.get("query_flag", 1) == 0]
         
         def disable_controls():
             """禁用控件"""
@@ -308,7 +304,8 @@ class TextExtractorApp:
             self.window_manager.save_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
             self.window_manager.exit_btn.setEnabled(False)
             self.window_manager.exit_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
-        
+            # self.window_manager.query_btn.setEnabled(False)
+            # self.window_manager.query_btn.setStyleSheet("background-color: #cccccc; color: #666666;")
         def enable_controls():
             """启用控件"""
             # self.hotkey_manager.setup_hotkeys()
@@ -317,28 +314,29 @@ class TextExtractorApp:
             self.window_manager.save_btn.setStyleSheet("")
             self.window_manager.exit_btn.setEnabled(True)
             self.window_manager.exit_btn.setStyleSheet("")
+            # self.window_manager.query_btn.setEnabled(True)
+            # self.window_manager.query_btn.setStyleSheet("")
             # self.window_manager.log_signal.emit("启用热键和控件")
         
-        def query_task():
+        def query_task(query_data:list):
+
             try:
                 disable_controls()
                 api_key = self.config["api"]["api_key"]
                 self.window_manager._update_log("开始模型查询...")
-                for i in range(0,len(self.data)):
-                    self.window_manager._update_log(f"查询单词: {self.data[i]['单词']}")
-                    data = ask_model(api_key, word=self.data[i]["单词"], sentence=self.data[i]["例句"], config=self.config)
+                for i in range(0,len(query_data)):
+                    self.window_manager._update_log(f"查询单词: {query_data[i]['单词']}")
+                    data = ask_model(api_key, word=query_data[i]["单词"], sentence=query_data[i]["例句"], config=self.config)
                     if data is None:
                         self.window_manager._update_log("api调用失败，检查：1.api_key是否正确，2.使用VPN可能会导致调用失败")
                         break
                     # 逐个更新键值而不是直接覆盖
                     for key in data:
-                        self.data[i][key] = data[key]
-                    self.data[i]["query_flag"] = 1  # 保持查询标志设置
-                    self.window_manager.log_signal.emit(f"查询结果: {self.data[i]}")
+                        query_data[i][key] = data[key]
+                    query_data[i]["query_flag"] = 1  # 保持查询标志设置
+                    self.window_manager.log_signal.emit(f"查询结果: {query_data[i]}")
                     
-                self.query_file_operation=True
-                self._save_temp_data()  # 保存更新后的查询状态
-                self.query_file_operation=False
+                self.save_temp_data(query_data)  # 保存更新后的查询状态
                 self.window_manager._update_log("模型查询完成")
             except Exception as e:
                 error_message = f"查询错误: {str(e)}"
@@ -348,21 +346,24 @@ class TextExtractorApp:
                 # 设置查询完成标志
                 self._query_complete = True
 
-        if self.data:
+        if query_data:
             self._query_complete = False  # 新增：查询完成标志
-            threading.Thread(target=query_task, daemon=True).start()
+            threading.Thread(target=query_task(query_data), daemon=True).start()
+        else:
+            self.window_manager.log_signal.emit(f"无有效查询数据")
+            print(f"无有效查询数据")
 
     def exit(self):
         """查询按钮点击事件"""
         self.window_manager._update_log("操作日志: 正在保存数据...")
         
         # 启动查询
-        self.model_query()
+        # self.model_query()
         
         # 等待查询完成
-        while not getattr(self, '_query_complete', True):
-            time.sleep(0.1)
-            self.window_manager.repaint()  # 强制重绘界面保持响应
+        # while not getattr(self, '_query_complete', True):
+        #     time.sleep(0.1)
+        #     self.window_manager.repaint()  # 强制重绘界面保持响应
         
         # 保存数据
         self.save_record()
@@ -396,66 +397,67 @@ class TextExtractorApp:
     def save_record(self):
         """保存记录到文件(支持追加模式)"""
         import pandas as pd
-        
-        if not self.data:
+        temp_data = self.get_temp_data()  # 查询前同步最新数据
+        # 保存所有查询完毕的单词
+        save_data = [item for item in temp_data if item.get("query_flag", 0) == 1]
+        if not save_data:
             self.window_manager._update_log("警告: 没有数据可保存")
             return
-    
+        
         try:
-            # 使用pandas保存CSV
             csv_filename = self.config["file"]["output_name"] + ".csv"
-            file_exists = os.path.exists(csv_filename)
-            
-            # 动态生成字段列表
-            if file_exists:
-                # 读取已有文件的列名
-                existing_columns = pd.read_csv(csv_filename, nrows=0).columns.tolist()
-                # 过滤数据只保留已有列
-                filtered_data = []
-                for item in self.data:
-                    filtered_item = {k: v for k, v in item.items() if k in existing_columns}
-                    filtered_data.append(filtered_item)
-            else:
-                # 新文件时使用全部字段
-                all_keys = set().union(*(d.keys() for d in self.data))
-                fieldnames = [k for k in self.required_keys if k in all_keys] + \
-                            [k for k in all_keys if k not in self.required_keys and k != 'query_flag'] + \
-                            ['query_flag']
-                filtered_data = self.data
-            
-            # 转换为DataFrame并保存
-            df = pd.DataFrame(filtered_data)
-            df.to_csv(csv_filename, mode='a', index=False, 
-                     header=not file_exists, encoding='utf-8-sig')
-                    
+            if os.path.exists(csv_filename):
+                # 读取最终文件中的数据
+                df = pd.read_csv(self.config["file"]["output_name"] + ".csv", encoding='utf-8-sig')
+                # 合并数据
+                df = pd.concat([df, pd.DataFrame(save_data)], ignore_index=True)
+            else :
+                df = pd.DataFrame(save_data)
+            # 去重
+            df = df.drop_duplicates(subset=['单词'], keep='first')
+            # 保存
+            df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
             self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
-
-            # # Excel文件保存
-            # excel_filename = self.config["file"]["output_name"] + ".xlsx"
             
-            # if os.path.exists(excel_filename) and append_mode:
-            #     wb = load_workbook(excel_filename)
-            #     ws = wb.active
-            #     start_row = ws.max_row + 1 if ws.max_row > 1 else 1
-            # else:
-            #     wb = Workbook()
-            #     ws = wb.active
-            #     start_row = 1
-            #     # 添加表头
-            #     header_font = Font(bold=True)
-            #     for col, key in enumerate(self.data[0].keys(), 1):
-            #         ws.cell(row=1, column=col, value=key).font = header_font
 
-            # # 写入数据
-            # for row_idx, item in enumerate(self.data, start=start_row):
-            #     for col_idx, value in enumerate(item.values(), 1):
-            #         ws.cell(row=row_idx, column=col_idx, value=value)
+            self.del_query_data()  # 删除已经查询过的数据
 
-            # wb.save(excel_filename)
-            # self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(excel_filename)}")
 
-            # 保留临时文件数据
-            self._sync_temp_data()  # 重新加载最新数据
+        # if not save_data:
+        #     self.window_manager._update_log("警告: 没有数据可保存")
+        #     return
+    
+        # try:
+        #     # 使用pandas保存CSV
+        #     csv_filename = self.config["file"]["output_name"] + ".csv"
+        #     file_exists = os.path.exists(csv_filename)
+            
+        #     # 动态生成字段列表
+        #     if file_exists:
+        #         # 读取已有文件的列名
+        #         existing_columns = pd.read_csv(csv_filename, nrows=0).columns.tolist()
+        #         # 过滤数据只保留已有列
+        #         filtered_data = []
+        #         for item in save_data:
+        #             filtered_item = {k: v for k, v in item.items() if k in existing_columns}
+        #             filtered_data.append(filtered_item)
+        #     else:
+        #         # 新文件时使用全部字段
+        #         all_keys = set().union(*(d.keys() for d in save_data))
+        #         fieldnames = [k for k in self.required_keys if k in all_keys] + \
+        #                     [k for k in all_keys if k not in self.required_keys and k != 'query_flag'] + \
+        #                     ['query_flag']
+        #         filtered_data = save_data
+            
+        #     # 转换为DataFrame并保存
+        #     df = pd.DataFrame(filtered_data)
+        #     df.to_csv(csv_filename, mode='a', index=False, 
+        #              header=not file_exists, encoding='utf-8-sig')
+                    
+        #     self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
+
+        #     # 删除以保留的临时文件
+        #     self.save_temp_data()  # 重新加载最新数据
         except Exception as e:
             self.window_manager._update_log(f"保存失败: {str(e)}")
 

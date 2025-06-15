@@ -267,7 +267,7 @@ class SettingsDialog(QDialog):
         self.prompt_edit.setPlainText(config["prompt"].get("default", ""))
 
 class WordListWindow(QDialog):
-    def __init__(self, app, parent=None):
+    def __init__(self, main_window, parent=None):
         self.setStyleSheet("""
             QListWidget {
                 border: 1px solid #ddd;
@@ -286,11 +286,11 @@ class WordListWindow(QDialog):
             }
         """)
 
-    def __init__(self, app, parent=None):
+    def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.setWindowTitle("单词列表")
         self.resize(600, 600)
-        self.app = app
+        self.main_window = main_window
         self._init_ui()
         # 统一设置样式
         self.setStyleSheet("""
@@ -336,7 +336,8 @@ class WordListWindow(QDialog):
     def _load_data(self):
         """加载数据到列表"""
         self.list_widget.clear()
-        for idx, item in enumerate(self.app.app.data):
+        word_list = self.main_window.app.get_temp_data()
+        for idx, item in enumerate(word_list):
             list_item = QListWidgetItem()
             widget = QWidget()
             item_layout = QHBoxLayout(widget)
@@ -377,13 +378,15 @@ class WordListWindow(QDialog):
         
         # 反向删除避免索引错乱
         if selected_indices:
+            # 去读临时文件
+            word_list = self.main_window.app.get_temp_data()
             # 直接删除数据并保存到临时文件
             for idx in reversed(sorted(selected_indices)):
-                if 0 <= idx < len(self.app.app.data):
-                    del self.app.app.data[idx]
+                if 0 <= idx < len(word_list):
+                    del word_list[idx]
             
-            self.app.app._save_temp_data()  # 强制保存到临时文件
+            self.main_window.app.save_temp_data(word_list)  # 强制保存到临时文件
             self._load_data()
-            self.app.app.window_manager.log_signal.emit(f"已删除{len(selected_indices)}条记录并更新临时文件")
+            self.main_window.app.window_manager.log_signal.emit(f"已删除{len(selected_indices)}条记录并更新临时文件")
         else:
-            self.app.app.window_manager.log_signal.emit("请先选择要删除的条目")
+            self.main_window.app.window_manager.log_signal.emit("请先选择要删除的条目")
