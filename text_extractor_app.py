@@ -21,7 +21,11 @@ class TextExtractorApp:
         self.data_lock = threading.Lock()  # 初始化线程锁
         self.config = self.load_config()
         self.required_keys = self.get_required_keys()
-        self.temp_file = os.path.join(os.path.dirname(__file__), "temp_words.csv")
+        self.config_file = 'config.ini'
+        # 使用配置文件中的绝对路径设置
+        base_dir = self.config["file"].get("absolute_path", os.path.dirname(os.path.abspath(__file__)))
+        self.temp_file = os.path.join(base_dir, "temp_words.csv")
+        
         self.file_operation = self.QueryFileOperation(self.temp_file)  # 初始化文件锁
         self.window_manager=WindowManagerQt(self)
         # 初始化管理器（延迟到QApplication创建后）
@@ -38,6 +42,15 @@ class TextExtractorApp:
             
         def acquire(self):
             start_time = time.time()
+            # 确保锁文件所在目录存在
+            lock_dir = os.path.dirname(self.lock_file)
+            if not os.path.exists(lock_dir):
+                try:
+                    os.makedirs(lock_dir, exist_ok=True)
+                except Exception as e:
+                    print(f"创建目录失败: {e}")
+                    return False
+            
             while True:
                 try:
                     # Windows文件锁实现
@@ -47,6 +60,9 @@ class TextExtractorApp:
                     if time.time() - start_time > self.timeout:
                         return False
                     time.sleep(self.retry_interval)
+                except (FileNotFoundError, OSError) as e:
+                    print(f"创建锁文件失败: {e}")
+                    return False
                     
         def release(self):
             if self.fd:
@@ -431,13 +447,16 @@ class TextExtractorApp:
             return
         
         try:
-            csv_filename = self.config["file"]["output_name"] + ".csv"
+            # 使用配置文件中指定的绝对路径
+            base_dir = self.config["file"].get("absolute_path", os.path.dirname(os.path.abspath(__file__)))
+            csv_filename = os.path.join(base_dir, self.config["file"]["output_name"] + ".csv")
+            
             if os.path.exists(csv_filename):
                 # 读取最终文件中的数据
-                df = pd.read_csv(self.config["file"]["output_name"] + ".csv", encoding='utf-8-sig')
+                df = pd.read_csv(csv_filename, encoding='utf-8-sig')
                 # 合并数据
                 df = pd.concat([df, pd.DataFrame(save_data)], ignore_index=True)
-            else :
+            else:
                 df = pd.DataFrame(save_data)
             # 去重
             df = df.drop_duplicates(subset=['单词'], keep='first')
@@ -446,12 +465,12 @@ class TextExtractorApp:
             self.window_manager._update_log(f"✓ 成功保存到 {os.path.abspath(csv_filename)}")
             
             # 新增功能：分析词根、前缀、后缀
-            self._analyze_word_components(df)
+            self._analyze_word_components(df, base_dir)
             
         except Exception as e:
             self.window_manager._update_log(f"保存失败: {str(e)}")
     
-    def _analyze_word_components(self, df):
+    def _analyze_word_components(self, df, base_dir):
         """分析词根、前缀、后缀并生成总结文件"""
         import pandas as pd
         from collections import defaultdict
@@ -522,8 +541,8 @@ class TextExtractorApp:
                             })
                     
                     if summary_data:
-                        # 保存到CSV
-                        filename = f"{base_name}_{component_type}总结.csv"
+                        # 保存到CSV，使用绝对路径
+                        filename = os.path.join(base_dir, f"{base_name}_{component_type}总结.csv")
                         summary_df = pd.DataFrame(summary_data)
                         summary_df.to_csv(filename, index=False, encoding='utf-8-sig')
                         self.window_manager._update_log(f"✓ 生成{component_type}总结文件: {os.path.abspath(filename)}")

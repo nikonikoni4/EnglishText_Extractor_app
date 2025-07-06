@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout, 
                               QGridLayout, QLabel, QLineEdit, QPushButton, QTextEdit,
-                              QMenuBar,QApplication,
+                              QMenuBar,QApplication, QFileDialog,
                               QListWidget, QListWidgetItem, QCheckBox, QSizePolicy)  # 添加QSizePolicy
 
 from PySide6.QtGui import QAction
@@ -63,11 +63,13 @@ class WindowManagerQt(QMainWindow):
         self.query_btn = QPushButton("🤖 模型查词")
         self.save_btn = QPushButton("💾 保存记录")
         self.exit_btn = QPushButton("❌ 保存退出")
+        self.path_setting_btn = QPushButton("📁 设置路径")
         
         btn_layout.addWidget(self.add_word_btn, 0, 0)
         btn_layout.addWidget(self.query_btn, 0, 1)
         btn_layout.addWidget(self.save_btn, 1, 0)
         btn_layout.addWidget(self.exit_btn, 1, 1)
+        btn_layout.addWidget(self.path_setting_btn, 2, 0, 1, 2)  # 跨两列
         
         main_layout.addWidget(btn_group)
 
@@ -101,6 +103,7 @@ class WindowManagerQt(QMainWindow):
         self.query_btn.clicked.connect(self.app.model_query)
         self.save_btn.clicked.connect(self.app.save_record)
         self.exit_btn.clicked.connect(self.app.exit)
+        self.path_setting_btn.clicked.connect(self.show_path_setting_dialog)
         self.log_signal.connect(self._update_log)
         
         # 初始化显示热键配置
@@ -167,6 +170,73 @@ class WindowManagerQt(QMainWindow):
             self.word_list_window = WordListWindow(self)
         self.word_list_window._load_data()  # 总是先刷新数据
         self.word_list_window.show()       # 再显示窗口
+    
+    def show_path_setting_dialog(self):
+        """显示路径设置对话框"""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QMessageBox
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("设置存储路径")
+        dialog.setFixedSize(500, 150)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # 当前路径显示
+        current_path = self.app.config["file"].get("absolute_path", "")
+        path_layout = QHBoxLayout()
+        path_label = QLabel("当前路径:")
+        path_display = QLineEdit(current_path)
+        path_display.setReadOnly(True)
+        browse_btn = QPushButton("浏览...")
+        
+        path_layout.addWidget(path_label)
+        path_layout.addWidget(path_display)
+        path_layout.addWidget(browse_btn)
+        
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+        save_btn = QPushButton("保存")
+        cancel_btn = QPushButton("取消")
+        btn_layout.addWidget(save_btn)
+        btn_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(path_layout)
+        layout.addLayout(btn_layout)
+        
+        def browse_path():
+            selected_path = QFileDialog.getExistingDirectory(dialog, "选择存储路径", current_path)
+            if selected_path:
+                path_display.setText(selected_path)
+        
+        def save_path():
+            new_path = path_display.text().strip()
+            if new_path:
+                try:
+                    # 更新配置
+                    self.app.config["file"]["absolute_path"] = new_path
+                    
+                    # 更新应用中的临时文件路径
+                    import os
+                    self.app.temp_file = os.path.join(new_path, "temp_words.csv")
+                    self.app.file_operation = self.app.QueryFileOperation(self.app.temp_file)
+                    
+                    # 保存配置到文件
+                    with open(self.app.config_file, 'w', encoding='utf-8') as f:
+                        self.app.config.write(f)
+                    
+                    self.log_signal.emit(f"路径已更新为: {new_path}")
+                    QMessageBox.information(dialog, "成功", "路径设置已保存！")
+                    dialog.accept()
+                except Exception as e:
+                    QMessageBox.warning(dialog, "错误", f"保存路径失败: {str(e)}")
+            else:
+                QMessageBox.warning(dialog, "警告", "请选择一个有效的路径！")
+        
+        browse_btn.clicked.connect(browse_path)
+        save_btn.clicked.connect(save_path)
+        cancel_btn.clicked.connect(dialog.reject)
+        
+        dialog.exec()
 
     def show_settings_dialog(self):
         dialog = SettingsDialog(self.app, self)
@@ -191,6 +261,11 @@ class SettingsDialog(QDialog):
         self.add_data_hotkey_edit = QLineEdit()
         self.prompt_edit = QTextEdit()
         
+        # 路径设置相关
+        self.path_display = QLineEdit()
+        self.path_display.setReadOnly(True)
+        self.path_btn = QPushButton("选择路径")
+        
         form_layout = QGridLayout()
         form_layout.addWidget(QLabel("文件名称"), 0, 0)
         form_layout.addWidget(self.output_name_edit, 0, 1)
@@ -202,6 +277,18 @@ class SettingsDialog(QDialog):
         form_layout.addWidget(self.sentence_hotkey_edit, 3, 1)
         form_layout.addWidget(QLabel("添加数据"), 4, 0)
         form_layout.addWidget(self.add_data_hotkey_edit, 4, 1)
+        
+        # 路径设置行
+        form_layout.addWidget(QLabel("存储路径"), 5, 0)
+        path_layout = QHBoxLayout()
+        path_layout.addWidget(self.path_display)
+        path_layout.addWidget(self.path_btn)
+        path_widget = QWidget()
+        path_widget.setLayout(path_layout)
+        form_layout.addWidget(path_widget, 5, 1)
+        
+        # 连接路径选择按钮
+        self.path_btn.clicked.connect(self.select_path)
         
         layout.addLayout(form_layout)
         layout.addWidget(QLabel("Prompt"))
@@ -222,6 +309,18 @@ class SettingsDialog(QDialog):
         
         # 加载当前配置
         self._load_settings()
+    
+    def select_path(self):
+        """选择存储路径"""
+        current_path = self.path_display.text() or self.app.config["file"].get("absolute_path", "")
+        selected_path = QFileDialog.getExistingDirectory(
+            self, 
+            "选择存储路径", 
+            current_path
+        )
+        if selected_path:
+            self.path_display.setText(selected_path)
+            self.app.window_manager.log_signal.emit(f"已选择路径: {selected_path}")
 
     def save_settings(self):
         """保存配置到文件"""
@@ -233,6 +332,15 @@ class SettingsDialog(QDialog):
             self.app.config["hotkeys"]["get_sentence_hotkey"] = self.sentence_hotkey_edit.text()
             self.app.config["hotkeys"]["add_data"] = self.add_data_hotkey_edit.text()
             self.app.config["prompt"]["default"] = self.prompt_edit.toPlainText()
+            
+            # 更新路径配置
+            new_path = self.path_display.text().strip()
+            if new_path:
+                self.app.config["file"]["absolute_path"] = new_path
+                # 更新应用中的临时文件路径
+                import os
+                self.app.temp_file = os.path.join(new_path, "temp_words.csv")
+                self.app.file_operation = self.app.QueryFileOperation(self.app.temp_file)
             
             
             # 更新热键
@@ -265,6 +373,10 @@ class SettingsDialog(QDialog):
         self.sentence_hotkey_edit.setText(config["hotkeys"]["get_sentence_hotkey"])
         self.add_data_hotkey_edit.setText(config["hotkeys"]["add_data"])
         self.prompt_edit.setPlainText(config["prompt"].get("default", ""))
+        
+        # 加载路径配置
+        current_path = config["file"].get("absolute_path", "")
+        self.path_display.setText(current_path)
 
 class WordListWindow(QDialog):
     def __init__(self, main_window, parent=None):
