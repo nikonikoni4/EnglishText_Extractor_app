@@ -2,7 +2,7 @@
 
 这是一个用于单词和句子提取的桌面小应用。可以实现提取所遇见的单词和句子，通过接入deepseek的api进行查询prompt中所自定义的内容（比如kk音标，例句，近义词，形近词等）。查询的数据保存为CSV文件可以直接导入到Anki中快速制作卡片。
 
-<img src=".\figure\image-20250417155619662.png" alt="image-20250417155619662" style="zoom:50%;" />
+<img src=".\figure\主界面.jpg" alt="主界面" style="zoom:50%;" />
 
 
 
@@ -11,16 +11,28 @@
 # 使用方法
 
 0. **修改配置文件名词**：
-   将config copy.ini 修改为 config.ini
+    将config copy.ini 修改为 config.ini
 
-1. **配置api和快捷键**：点击菜单，打开设置，输入deepseek的api并保存。设置相关快接键
+1. **设置文件路径**：点击“设置路径”，选择路径。
+
+   在该路径下会生成：
+
+   - 单词列表.csv
+   - 单词列表_词根总结.csv
+   - 单词列表_后缀总结.csv
+   - 单词列表_前缀总结.csv
+   - temp_words.csv（临时文件）
+
+2. **配置api和快捷键**：点击菜单，打开设置，输入deepseek的api并保存。设置相关快接键
 
    <img src=".\figure\image-20250417155058076.png" alt="image-20250417155058076" style="zoom: 50%;" />
 
-2. **配置prompt**：在prompt中修改相应内容自定义需要deepseek回复的信息，并对相应回复内容做出要求
+3. **配置prompt**：在prompt中修改相应内容自定义需要deepseek回复的信息，并对相应回复内容做出要求
     <img src=".\figure\image-20250417155449794.png" alt="image-20250417155449794" style="zoom: 50%;" />
 
-   
+    
+
+  
 
 4. **添加单词**：选择单词或句子->按下相应快捷键对单词或句子进行提取，**按下“添加单词”或快捷键进行添加**。
 
@@ -34,6 +46,6 @@
 
    <img src=".\figure\image-20250417160010561.png" alt="image-20250417160010561" style="zoom: 30%;" />
 
-9. **导入anki**: 导出的csv文件，如：单词列表.csv，词根总结.csv可以直接导入到anki中。需要在anki中创建相应牌组，设定相关字段，然后导入。
+9. **导入anki**: 导出的csv文件，如：单词列表.csv，可以直接导入到anki中。需要在anki中创建相应牌组，设定相关字段，然后导入。
 
    
